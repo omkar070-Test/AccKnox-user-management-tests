@@ -1,3 +1,5 @@
+1. Playwright Test Script (Python):
+
 import pytest
 from playwright.sync_api import sync_playwright
 
@@ -100,12 +102,12 @@ def test_user_management_flow(browser_context):
     # 6. Delete user
     delete_user(page)
 
-Run the test :
-pytest test_orangehrm_user_management.py
-
-
     # 7. Confirm deletion
     search_user(page, updated_data["username"])
     assert page.locator("span.oxd-text").nth(1).inner_text() == "No Records Found"
 
     page.close()
+
+2. Run the test cases:
+
+pytest test_orangehrm_user_management.py
