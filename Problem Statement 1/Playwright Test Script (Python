@@ -1,0 +1,111 @@
+import pytest
+from playwright.sync_api import sync_playwright
+
+# Test Data
+url = "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login"
+admin_user = "Admin"
+admin_pass = "admin123"
+
+user_data = {
+    "role": "ESS",
+    "employee_name": "Linda Anderson",  # Valid employee name in demo
+    "username": "testuser123",
+    "status": "Enabled",
+    "password": "Test@1234"
+}
+
+updated_data = {
+    "role": "Admin",
+    "status": "Disabled",
+    "username": "testuser456"
+}
+
+@pytest.fixture(scope="session")
+def browser_context():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        yield context
+        browser.close()
+
+def login(page):
+    page.goto(url)
+    page.fill('input[name="username"]', admin_user)
+    page.fill('input[name="password"]', admin_pass)
+    page.click('button[type="submit"]')
+    page.wait_for_selector("text=Admin")
+
+def go_to_admin(page):
+    page.click("text=Admin")
+    page.wait_for_selector("text=User Management")
+
+def add_user(page):
+    page.click("button:has-text('Add')")
+    page.wait_for_selector("text=Add User")
+    page.locator("div[role='listbox']").nth(0).click()
+    page.locator("div[role='option']", has_text=user_data["role"]).click()
+    page.fill("input[placeholder='Type for hints...']", user_data["employee_name"])
+    page.locator("div[role='option']").first.click()
+    page.fill("input[autocomplete='off']", user_data["username"])
+    page.locator("div[role='listbox']").nth(1).click()
+    page.locator("div[role='option']", has_text=user_data["status"]).click()
+    page.fill("input[type='password']").nth(0).fill(user_data["password"])
+    page.fill("input[type='password']").nth(1).fill(user_data["password"])
+    page.click("button:has-text('Save')")
+    page.wait_for_timeout(2000)
+
+def search_user(page, username):
+    page.fill("input[placeholder='Username']", username)
+    page.click("button:has-text('Search')")
+    page.wait_for_timeout(1000)
+
+def edit_user(page):
+    page.click("i.bi-pencil-fill")  # Edit icon
+    page.wait_for_selector("text=Edit User")
+    page.locator("div[role='listbox']").nth(0).click()
+    page.locator("div[role='option']", has_text=updated_data["role"]).click()
+    page.fill("input[autocomplete='off']").nth(1).fill(updated_data["username"])
+    page.locator("div[role='listbox']").nth(1).click()
+    page.locator("div[role='option']", has_text=updated_data["status"]).click()
+    page.click("button:has-text('Save')")
+    page.wait_for_timeout(1000)
+
+def delete_user(page):
+    page.locator("input[type='checkbox']").nth(1).check()
+    page.click("button:has-text('Delete Selected')")
+    page.click("button:has-text('Yes, Delete')")
+    page.wait_for_timeout(1000)
+
+def test_user_management_flow(browser_context):
+    page = browser_context.new_page()
+
+    # 1. Login and navigate
+    login(page)
+    go_to_admin(page)
+
+    # 2. Add user
+    add_user(page)
+
+    # 3. Search user
+    search_user(page, user_data["username"])
+    assert page.locator("div.oxd-table-cell").first.is_visible()
+
+    # 4. Edit user
+    edit_user(page)
+
+    # 5. Validate updated user
+    search_user(page, updated_data["username"])
+    assert page.locator("div.oxd-table-cell").first.inner_text().__contains__(updated_data["username"])
+
+    # 6. Delete user
+    delete_user(page)
+
+Run the test :
+pytest test_orangehrm_user_management.py
+
+
+    # 7. Confirm deletion
+    search_user(page, updated_data["username"])
+    assert page.locator("span.oxd-text").nth(1).inner_text() == "No Records Found"
+
+    page.close()
